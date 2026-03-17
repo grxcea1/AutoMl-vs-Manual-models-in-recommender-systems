@@ -1,7 +1,7 @@
 from recsys_framework.preprocessing import preprocessing
 from recsys_framework.manuel_models import ManualModels
 from sklearn.metrics import mean_squared_error, mean_absolute_error
-from sklearn.metrics import f1_score, recall_score, precision_score  # BUG 1 - was missing
+from sklearn.metrics import f1_score, recall_score, precision_score 
 import numpy as np
 
 
