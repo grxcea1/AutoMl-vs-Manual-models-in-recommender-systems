@@ -6,8 +6,8 @@ class preprocessing:
 
 
     # constructor 
-
     def __init__(self):
+        # this initialises empty variables
         self.ratings = None
         self.users = None
         self.items = None
@@ -15,20 +15,20 @@ class preprocessing:
         self.X = None
         self.y = None 
 
-    
+    # function to load dataset
     def load_ratings(self):
         self.ratings = pd.read_csv("data/u.data.csv", sep="\t",
                       names=["user_id","item_id","rating","timestamp"])
         
 
 
-    
+    # function to load in users data
     def load_users(self):
         self.users = pd.read_csv("data/u.user.csv", sep="|",
                         names=["user_id","age","gender","occupation","zip"])
         
 
-
+    # function to load all the movie data
     def load_items(self):
         self.items = pd.read_csv("data/u.item.csv", sep="|", encoding="latin-1",
                         names=["item_id","title","release_date","video_release_date","IMDb_URL",
@@ -44,10 +44,10 @@ class preprocessing:
         self.data = self.ratings.merge(self.users, on = "user_id")
         self.data = self.data.merge(self.items, on="item_id")
 
-        # Take off irrelevant features/columns from the dataset
+        # this takes off irrelevant features/columns from the dataset
         self.data = self.data.drop(columns=["timestamp", "zip", "title", "release_date", "video_release_date", "IMDb_URL"])
 
-        self.data = self.data.dropna() #this handles missing data 
+        self.data = self.data.dropna() #this handles all missing data 
         self.data = self.data.drop_duplicates(subset=["user_id", "item_id"]) #this will handle my duplicates
 
 
@@ -111,7 +111,7 @@ print("\nSample training data:")
 print(X_train.head()) 
 
 
-#printing first5 lines for the ratings of the training data 
+#printing first 5 lines for the ratings of the training data 
 print("\nSample ratings:") 
 print(y_train.head()) 
 
