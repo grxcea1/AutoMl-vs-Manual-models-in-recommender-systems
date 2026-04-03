@@ -7,6 +7,10 @@ import matplotlib #load the matploy library
 matplotlib.use("agg") #'agg' is needed for when i want to save files
 import matplotlib.pyplot as plt #plt will be used to refer matplot library (for making graphs)
 import pandas as pd #import pandas for builidng dataframes
+import h2o
+from h2o.automl import H2OAutoML
+
+
 
 
 
@@ -25,6 +29,7 @@ def evaluate_model(y_test, y_pred):
   recall = recall_score(y_test_binary, y_pred_binary, zero_division=0) #this measures of all the good movies, how many did the recommender collect
   f1 = f1_score(y_test_binary, y_pred_binary, zero_division=0) #this gives a combined score of precison and recall
   return mse, rmse, mae, precision, recall, f1
+
 
 
 
@@ -53,6 +58,8 @@ def print_results(model_name, runtime, mse, rmse, mae, precision, recall, f1, pr
 
 
 
+
+
 #function to show the top 10 Recommendations per user
 def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids = None):
   print(f"\n  TOP 10 RECOMMENDATIONS  ({model_name})") #title
@@ -64,14 +71,10 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
   for user_id in sample_users_ids: #loops though each sample user one at a time (so it will repeat 3 times since we chose 3)
     all_items = preprocess.items["item_id"].unique() # this line gets every movie id that exists in the dataset
 
-
     #the next code is what gets us a list of movies the user has already seen/rated
     rated_items = preprocess.ratings[ #looks inside ratings table
       preprocess.ratings["user_id"] == user_id #this keeps only rows for this user
     ]["item_id"].unique()# takes just the movie ids(unqiue removes duplicates)
-
-
-
 
     unrated_items = [i for i in all_items if i not in rated_items] #loops though all the movie ids and performs the operation as long as the movie is not already rated
     user_row = preprocess.users[
@@ -79,8 +82,6 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
     if user_row.empty:
       continue #skip if the user doesnt exist as it will have no data
 
-
-  
     user_data = pd.DataFrame({'item_id': unrated_items})
     user_data['user_id'] = user_id
     user_data = user_data.merge(preprocess.users, on= "user_id", how="left") # this adds user details to the data 
@@ -95,7 +96,6 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
     user_data['gender'] = user_data['gender'].map({'M': 0, 'F': 1}) # convert gender to 1 and 0
     user_data = pd.get_dummies(user_data, columns=['occupation']) # makes occupations into binary form
 
-
     #this makes sure that training column order matches models expectations
     trained_cols = model.feature_names_in_ if hasattr(model, 'feature_names_in_') else None #if the models reme,bers column name then it should use them if not we set the column names to None
     if trained_cols is not None:   # continues if we have column names to use
@@ -104,7 +104,6 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
                     user_data[col] = 0  #this adds the column if the column is missing 
 
       user_data = user_data[trained_cols] #this reorders columns to match the training column order
-
     if user_data.empty:# skip the user if the dataframe is empty
             continue  
     
@@ -112,25 +111,20 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
     top10_idx = np.argsort(predicted)[::-1][:10] #use the index positions of the movies to display the movie names
     top10_titles = [titles[i] for i in top10_idx if i < len(titles)] # this checks if the index is valid ( it prevents the index out of range error )
 
-
     # prints the movie titles as a numbered list , just makes it easier to read
     top10_scores = [predicted[i] for i in top10_idx if i <len(titles)] #this prints top 10 movies 
 
     print("\n" + "-" * 46) #line to seperate, so its ready clearly
     print(f"  User {user_id} — Top 10 Recommendations") #prints the user id and the lable to know what the list is 
     print("-" * 46) #line to seperate, so its ready clearly
-  
 
     for rank, (title,score) in enumerate( #loops through titles, scores and ranking 
         zip(top10_titles, top10_scores), start=1):
         print(f"   {rank:2}. {title: <55} (predicted rating:{score:.1f}/5)") #this prints the numbered list (with the movie titles and the predicted rating)
-
     print("-" * 46) #line to seperate, so its ready clearly
-
 
   all_precisions = [] #stores precision at 10 for every test user (the 3 unique ones)
   all_recalls = [] #stores recalls at 10 for every test user (the 3 unique ones)
-
 
   #this loops through the 3 users in the test set
   for user_id in X_test["user_id"].unique():
@@ -138,34 +132,26 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
     user_test_ratings = y_test.loc[test_indices] #their actual ratings from the test data
     user_test_item_ids = X_test.loc[test_indices, "item_id"] #this is the movie ids the actual ratings belong to
 
-
     actual_ratings_connect = dict(zip(user_test_item_ids, user_test_ratings)) #this creates a dictionary that matchs the movies(item) to the real ratings
     actually_liked = set(item_id for item_id, rating in actual_ratings_connect.items() if rating >=4) #movies they actually liked get stored in a set
 
-
     if len(actually_liked) == 0:
         continue  # this skips users with no liked movies in the test set
-   
+
     all_items = preprocess.items["item_id"].unique() # this gets the unique movie (item) ids
     rated_items = preprocess.ratings[preprocess.ratings["user_id"] == user_id]["item_id"].unique() #gets all the item the user has already rated
 
-
     unrated_items = list(user_test_item_ids)
-
 
     user_row = preprocess.users[preprocess.users["user_id"] == user_id] # this line gets all the user data (so all the data in the different columns)
     if user_row.empty: #if the user data is missing this line skips the user
       continue
-
 
     user_data = pd.DataFrame({'item_id': unrated_items}) #this creates a dataframe of all unseen movies(items)
     user_data['user_id'] = user_id #this adds user ids to each row so the model knows who the recommendation is for
     user_data = user_data.merge(preprocess.users, on="user_id", how="left") #adds the user features to the user_data dataframe
     user_data = user_data.merge(preprocess.items, on="item_id", how="left") #adds the item feature to the user_data dataframe
     candidate_item_ids = user_data['item_id'].values #this saves the item ids before dropping columns
-
-
-
 
     drop_cols = ['timestamp', 'zip', 'title', 'release_date', 'video_release_date'] #these are the columns i dont want in the model
     drop_cols = [c for c in drop_cols if c in user_data.columns] #this makes sure only the columns that exist are kept
@@ -183,7 +169,6 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
  
     if user_data.empty:
       continue # if theres no data left it will skip the user
-
 
     predicted = model.predict(user_data)  #predicts ratings for unseen items
     top_k_idx = np.argsort(predicted)[::-1][:k] #this sorts the predictions from highest to lowest (this is out of the best recommendations)
@@ -216,9 +201,7 @@ def run_flaml(X_train, X_test, y_train, y_test,
     print("=" * 46)
 
     automl = AutoML()
-
     start = time.time()
-
     automl.fit(
         X_train=X_train,
         y_train=y_train,
@@ -227,9 +210,7 @@ def run_flaml(X_train, X_test, y_train, y_test,
         metric='rmse',
         verbose=0
     )
-
     runtime = time.time() - start
-
     best_name = automl.best_estimator
     print(f"\nFLAML selected: {best_name}")
     print("Note this algorithm name for your report")
@@ -239,11 +220,9 @@ def run_flaml(X_train, X_test, y_train, y_test,
         y_test, y_pred)
 
     best_model = automl.model.estimator
-
     prec_k, rec_k = show_top10(
         best_model, preprocess, 'FLAML',
         X_test, y_test, sample_users_ids=[1, 2, 3])
-
     print_results('FLAML', runtime, mse, rmse, mae,
                   precision, recall, f1, prec_k, rec_k)
 
@@ -254,6 +233,7 @@ def run_flaml(X_train, X_test, y_train, y_test,
         'Precision@k': prec_k, 'Recall@k': rec_k,
         'Best Algorithm': best_name
     }
+
 
 
 
@@ -289,7 +269,6 @@ def run_pycaret(X_train, X_test, y_train, y_test, preprocess):
         n_select=1,
         verbose=False
     )
-
     runtime = time.time() - start
     results_df = pull()
     best_name = str(results_df.index[0])
@@ -323,11 +302,25 @@ def run_pycaret(X_train, X_test, y_train, y_test, preprocess):
 
 
 
+def undummy_occupation(df):
+    """Collapse occupation_* dummy columns back into one string column."""
+    occ_cols = [c for c in df.columns if c.startswith("occupation_")]
+    if occ_cols:
+        df = df.copy()
+        df["occupation"] = (
+            df[occ_cols]
+            .idxmax(axis=1)
+            .str.replace("occupation_", "", regex=False)
+        )
+        df = df.drop(columns=occ_cols)
+    return df
+
+
+
+
 
 def run_h2o(X_train, X_test, y_train, y_test,
             preprocess, max_models=10):
-    import h2o
-    from h2o.automl import H2OAutoML
 
     print("\n" + "=" * 46)
     print("Running H2O AutoML...")
@@ -338,57 +331,45 @@ def run_h2o(X_train, X_test, y_train, y_test,
     h2o.init(verbose=False)
     h2o.no_progress()
 
-    train_df = X_train.copy()
+    train_df = undummy_occupation(X_train.copy()).reset_index(drop=True) #this is so we can use the same function to undummy the test data and train data (we will use the test data to get the column names for the model to use)
     train_df['rating'] = y_train.values
+
+    test_df = undummy_occupation(X_test.copy()).reset_index(drop=True) #this is so we can use the same function to undummy the test data and train data (we will use the test data to get the column names for the model to use)
+    test_df['rating'] = 0  # dummy column
+
+    # Convert to H2OFrame — H2O handles categoricals natively
     train_h2o = h2o.H2OFrame(train_df)
-    test_h2o = h2o.H2OFrame(X_test.copy())
-    feature_cols = X_train.columns.tolist()
+    test_h2o = h2o.H2OFrame(test_df)
+
+    # Tell H2O which columns are categorical so it encodes them consistently
+    for col in train_h2o.columns:
+        if train_h2o[col].isfactor()[0] or train_df[col].dtype == object:
+            train_h2o[col] = train_h2o[col].asfactor()
+            test_h2o[col] = test_h2o[col].asfactor()
+
+    feature_cols = [c for c in train_df.columns if c != 'rating']
     target_col = 'rating'
-
-    aml = H2OAutoML(
-        max_models=max_models,
-        seed=42,
-        sort_metric='RMSE'
-    )
-
+    aml = H2OAutoML(max_models=max_models, seed=42, sort_metric='RMSE')
     start = time.time()
-
-    aml.train(
-        x=feature_cols,
-        y=target_col,
-        training_frame=train_h2o
-    )
-    
+    aml.train(x=feature_cols, y=target_col, training_frame=train_h2o)
     runtime = time.time() - start
+
     best_name = aml.leader.algo
     print(f"\nH2O selected: {best_name}")
     print("Note this algorithm name for your report")
 
     preds_h2o = aml.leader.predict(test_h2o)
     y_pred = preds_h2o.as_data_frame()['predict'].values
-    mse, rmse, mae, precision, recall, f1 = evaluate_model(
-        y_test, y_pred)
+    mse, rmse, mae, precision, recall, f1 = evaluate_model(y_test, y_pred)
 
-
-    class H2OWrapper:
-        def __init__(self, leader, test_frame_cols):
-            self.leader = leader
-            self.cols = test_frame_cols
-            self.feature_names_in_ = test_frame_cols 
-
-        def predict(self, X):
-            frame = h2o.H2OFrame(X)
-            preds = self.leader.predict(frame)
-            return preds.as_data_frame()['predict'].values
-
-    wrapped = H2OWrapper(aml.leader, X_test.columns.tolist())
+    wrapped = H2OWrapper(aml.leader, feature_cols)
     prec_k, rec_k = show_top10(
         wrapped, preprocess, 'H2O AutoML',
         X_test, y_test, sample_users_ids=[1, 2, 3])
 
     print_results('H2O AutoML', runtime, mse, rmse, mae,
                   precision, recall, f1, prec_k, rec_k)
-    h2o.shutdown(prompt=False)
+
     return {
         'MSE': mse, 'RMSE': rmse, 'MAE': mae,
         'Precision': precision, 'Recall': recall,
@@ -399,7 +380,45 @@ def run_h2o(X_train, X_test, y_train, y_test,
 
  
 
-  
+
+
+
+
+
+
+
+
+
+class H2OWrapper:
+    def __init__(self, leader, feature_cols):
+        self.leader = leader
+        self.feature_names_in_ = feature_cols
+
+    @staticmethod
+    def _undummy(df):
+        occ_cols = [c for c in df.columns if c.startswith("occupation_")]
+        if occ_cols:
+            df = df.copy()
+            df["occupation"] = (
+                df[occ_cols]
+                .idxmax(axis=1)
+                .str.replace("occupation_", "", regex=False)
+            )
+            df = df.drop(columns=occ_cols)
+        return df
+
+    def predict(self, X):
+        df = self._undummy(X.copy())        # ← actually call _undummy
+        frame = h2o.H2OFrame(df)
+        if "occupation" in frame.columns:
+            frame["occupation"] = frame["occupation"].asfactor()  # ← mark as categorical
+        preds = self.leader.predict(frame)
+        return preds.as_data_frame()['predict'].values
+
+
+
+
+
 
 
 
@@ -421,23 +440,17 @@ def save_comparison_chart(results, suffix= "automl"): #this stores the table as 
         ("Recall@k",    "Recall@10",  "Which AutoML found most liked movies in top 10?"),
     ]
     
-
-    
-    
     for key, ylabel, title in metrics: #for loop used to loop through each metric 
-
         
         vals = [results[m][key] for m in model_names] #stores the metric value for each model 
 
         plt.figure(figsize=(8, 5))  # makes a chart gets its own figure
 
-        
         bars = plt.bar(model_names, vals, color=colors, edgecolor='white') #this draws a bar chart (one bar for each model)
 
         plt.title(title, fontsize=12, fontweight='bold')  # this adds a title to the chart
         plt.ylabel(ylabel, fontsize=10)                   # label for the y axis 
         plt.ylim(0, max(vals) * 1.25)                     # this is just so the y axis is taller then the highest value and doesnt get clipped 
-
 
         # loop through each bar and write its value on top of the bar just making it easier to analyse
         for bar, v in zip(bars, vals):
@@ -461,6 +474,9 @@ def save_comparison_chart(results, suffix= "automl"): #this stores the table as 
 
 
 
+
+
+
         
 # this function is what will allow all the models to run in the correct order
 def run():   
@@ -469,19 +485,17 @@ def run():
     X_train, X_test, y_train, y_test = preprocess.load_and_preprocess() #performs preprocessing on data set
 
     print(f"Training set size: {X_train.shape[0]} rows")
-    print(f"Test set size:     {X_test.shape[0]} rows")
+    print(f"Test set size:     {X_test.shape[0]} rows")                   
     print(f"Features:          {X_train.shape[1]} columns")
 
     results = {}
 
-    
     try:
         results['FLAML'] = run_flaml(
             X_train, X_test, y_train, y_test,
             preprocess, time_budget=120)
     except Exception as e:
         print(f"\nFLAML failed: {e}")
-        print("Note this as a limitation in Section 5")
 
     
     try:
@@ -489,25 +503,19 @@ def run():
             X_train, X_test, y_train, y_test, preprocess)
     except Exception as e:
         print(f"\nPyCaret failed: {e}")
-        print("Note this as a limitation in Section 5")
 
    
     try:
         results['H2O AutoML'] = run_h2o(
             X_train, X_test, y_train, y_test,
             preprocess, max_models=10)
-    except Exception as e:
+    except Exception as e:  
         print(f"\nH2O failed: {e}")
-        print("Note this as a limitation in Section 5")
 
     if not results:
-        print("All frameworks failed — check installations")
         return
-    
-
 
     save_comparison_chart(results, suffix ="automl") #this saves all the results in the comparison table
-
 
     #this should print the comparison table of all 3 manual models
     print("\n\n" + "-" * 70)
@@ -525,6 +533,12 @@ def run():
             f"{m['F1']:>8.4f} {m['Runtime']:>7.1f}s"
         )
     print("-" * 70) #prints a line at the bottom of the table 
+
+    import json
+    with open('results_automl.json', 'w') as f:
+        json.dump(results, f)
+    print("Saved: results_automl.json")
+
     return results
 
 run()

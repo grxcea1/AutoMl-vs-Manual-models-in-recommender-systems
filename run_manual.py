@@ -17,22 +17,15 @@ import pandas as pd #import pandas for builidng dataframes
 
 
 
-
 #function to evaluate each model
 def evaluate_model(y_test, y_pred):
   mse = mean_squared_error(y_test, y_pred) #this caluculates the error between predictions (it gets squared so that the negatives and positives dont cacel eachother out)
   rmse = np.sqrt(mse) #sqrt of mse (this is so that it is the same scale as the ratings)(lower = more accurate)
-  mae = mean_absolute_error(y_test, y_pred) #this s the average error with no penalisation on wrong answers
-
-
-
+  mae = mean_absolute_error(y_test, y_pred) #this s the average error with no penalisation on wrong answer
 
   # this bit changes ratings into yes or no (binary 0/1) - precison,recall and f1 can only work on binary
   y_test_binary = (np.array(y_test) >= 4).astype(int) #so if rating is 4 or 5 (liked it)
   y_pred_binary = (np.array(y_pred) >= 4).astype(int) #if rating is 3-1 (didnt like it)
-
-
-
 
   precision = precision_score(y_test_binary, y_pred_binary, zero_division= 0) # this works out, of all the that i collected which ones were good
   recall = recall_score(y_test_binary, y_pred_binary, zero_division=0) #this measures of all the good movies, how many did the recommender collect
@@ -40,14 +33,6 @@ def evaluate_model(y_test, y_pred):
 
 
   return mse, rmse, mae, precision, recall, f1
-
-
-
-
-
-
-
-
 
 
 
@@ -83,8 +68,6 @@ def print_results(model_name, runtime, mse, rmse, mae, precision, recall, f1, pr
 
 
 
-
-
 #function to show the top 10 Recommendations per user
 def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids = None):
   print(f"\n  TOP 10 RECOMMENDATIONS  ({model_name})") #title
@@ -102,42 +85,26 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
       preprocess.ratings["user_id"] == user_id #this keeps only rows for this user
     ]["item_id"].unique()# takes just the movie ids(unqiue removes duplicates)
 
-
-
-
     unrated_items = [i for i in all_items if i not in rated_items] #loops though all the movie ids and performs the operation as long as the movie is not already rated
     user_row = preprocess.users[preprocess.users["user_id"] == user_id] # making sure the user exists in the user dataset
     if user_row.empty:
       continue #skip if the user doesnt exist as it will have no data
 
-
     user_data = pd.DataFrame({'item_id': unrated_items})
     user_data['user_id'] = user_id
-
-
-
 
     user_data = user_data.merge(preprocess.users, on= "user_id", how="left") # this adds user details to the data
     user_data = user_data.merge(preprocess.items, on= "item_id", how="left") # this adds movies details the data
 
 
     cand_item_ids = user_data["item_id"].values #this saves item ideas before i drop it (needed for calculation)
-
-
     titles = user_data["title"].values #this just saves the movie titles so we can display them later
-
-
     drop_cols = ['timestamp', 'zip', 'title', 'release_date', 'video_release_date'] #this code just removes irrelevant columns
     drop_cols = [c for c in drop_cols if c in user_data.columns]
     user_data = user_data.drop(columns=drop_cols)# this is necessary so we dont get an error if the column is already gone
-
-
     user_data = user_data.dropna() # remove any missing values
     user_data['gender'] = user_data['gender'].map({'M': 0, 'F': 1}) # convert gender to 1 and 0
     user_data = pd.get_dummies(user_data, columns=['occupation']) # makes occupations into binary form
-
-
-
 
     #this makes sure that training column order matches models expectations
     trained_cols = model.feature_names_in_ if hasattr(model, 'feature_names_in_') else None #if the models remembers column name then it should use them if not we set the column names to None
@@ -146,38 +113,25 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
                 if col not in user_data.columns:
                     user_data[col] = 0  #this adds the column if the column is missing
 
-
       user_data = user_data[trained_cols] #this reorders columns to match the training column order
-
 
     if user_data.empty:# skip the user if the dataframe is empty
             continue  
-   
+    
     predicted= model.predict(user_data) #model makes predictions on unrated movies based on what it has learned
     top10_idx = np.argsort(predicted)[::-1][:10] #use the index positions of the movies to display the movie names
     top10_titles = [titles[i] for i in top10_idx if i < len(titles)] # this checks if the index is valid ( it prevents the index out of range error )
 
-
-
-
     # prints the movie titles as a numbered list , just makes it easier to read
     top10_scores = [predicted[i] for i in top10_idx if i <len(titles)] #this prints top 10 movies
-
-
     print("\n" + "-" * 46) #line to seperate, so its ready clearly
     print(f"  User {user_id} — Top 10 Recommendations") #prints the user id and the lable to know what the list is
     print("-" * 46) #line to seperate, so its ready clearly
  
-
-
     for rank, (title,score) in enumerate( #loops through titles, scores and ranking
         zip(top10_titles, top10_scores), start=1):
         print(f"   {rank:2}. {title: <55} (predicted rating:{score:.1f}/5)") #this prints the numbered list (with the movie titles and the predicted rating)
-
-
     print("-" * 46) #line to seperate, so its ready clearly
- 
-
 
   all_precisions = [] #stores precision at 10 for every test user (the 3 unique ones)
   all_recalls = [] #stores recalls at 10 for every test user (the 3 unique ones)
@@ -202,8 +156,6 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
 
 
     unrated_items = list(user_test_item_ids)
-
-
     user_row = preprocess.users[preprocess.users["user_id"] == user_id] # this line gets all the user data (so all the data in the different columns)
     if user_row.empty: #if the user data is missing this line skips the user
       continue
@@ -214,9 +166,6 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
     user_data = user_data.merge(preprocess.users, on="user_id", how="left") #adds the user features to the user_data dataframe
     user_data = user_data.merge(preprocess.items, on="item_id", how="left") #adds the item feature to the user_data dataframe
     candidate_item_ids = user_data['item_id'].values #this saves the item ids before dropping columns
-
-
-
 
     drop_cols = ['timestamp', 'zip', 'title', 'release_date', 'video_release_date'] #these are the columns i dont want in the model
     drop_cols = [c for c in drop_cols if c in user_data.columns] #this makes sure only the columns that exist are kept
@@ -269,9 +218,6 @@ def run_shap(model, X_test, model_name):
         explainer = shap.KernelExplainer(model.predict, background) #this is a general SHAP explainer for any model
         shap_values = explainer.shap_values(X_sample) #Calculating SHAP values
 
-
-
-
     # the next code is what will plot the SHAP impact bar chart
     mean_shap = np.abs(shap_values).mean(axis=0) #np.abs removes negatives so directions dont cancel out and .mean(axis=0) averages across rows, giving one number per feature
     sorted_idx = np.argsort(mean_shap)[-15:] # get indices of the 15 most important features based on mean SHAP values
@@ -300,9 +246,6 @@ def run_shap(model, X_test, model_name):
 
 
 
-
-
-
 #this function is what plots comparisons charts for the different models based on the evaluationmetrics to answer my research question
 def save_comparison_chart(results): #this stores the table as a dictionary with the model and its metrics
    
@@ -319,29 +262,17 @@ def save_comparison_chart(results): #this stores the table as a dictionary with 
         ("Recall@k",    "Recall@10",    "Which model found the most liked movies in top 10?"),
     ]
 
-
-   
-   
     for key, ylabel, title in metrics: #for loop used to loop through each metric
 
-
-       
         vals = [results[m][key] for m in model_names] #stores the metric value for each model
-
 
         plt.figure(figsize=(8, 5))  # makes a chart gets its own figure
 
-
-       
         bars = plt.bar(model_names, vals, color=colors, edgecolor='white') #this draws a bar chart (one bar for each model)
-
 
         plt.title(title, fontsize=12, fontweight='bold')  # this adds a title to the chart
         plt.ylabel(ylabel, fontsize=10)                   # label for the y axis
         plt.ylim(0, max(vals) * 1.25)                     # this is just so the y axis is taller then the highest value and doesnt get clipped
-
-
-
 
         # loop through each bar and write its value on top of the bar just making it easier to analyse
         for bar, v in zip(bars, vals):
@@ -352,10 +283,7 @@ def save_comparison_chart(results): #this stores the table as a dictionary with 
                 ha='center', va='bottom', fontsize=10 #this is just for alignment making it easier to read (aligning it horizontally and vertically)
             )
 
-
         plt.tight_layout()  # adjusts spacing so nothing gets removed because its too big
-
-
         # saves each chart as its own file
         fname = f"chart_{key.lower()}_manual.png"
         plt.savefig(fname, dpi=150, bbox_inches='tight')
@@ -386,15 +314,12 @@ def run():
 
     results = {} #this stores all the metrics (so we can use it later in the comparison table )
  
-
-
     start = time.time() #this returns the current time to measure how long the model took
     dt_model = Models.decision_tree(X_train, y_train) #this trains the decsion tree model using the training data
     y_pred_dt = dt_model.predict(X_test) # this should return an array of prediction results
     runtime = time.time() - start #measures how long training and prediction took
     mse, rmse, mae, precision, recall, f1 = evaluate_model(y_test, y_pred_dt) #this calculates all the metrics using the evaluate_model function by comparing the predictions to the real values
     prec_k, rec_k = show_top10(dt_model, preprocess, 'Decision Tree', X_test, y_test, sample_users_ids=[1, 2, 3]) #this runs the evaluation for the decison tree model and stores precision@10 and recall@10 results
-
 
     #this stores the results that we have gotten inside the diction we made in the comparison table function
     results['Decision Tree'] = {
@@ -404,13 +329,11 @@ def run():
         'Precision@k': prec_k,  
         'Recall@k': rec_k  
     }
+    
     #prints the results
     print_results('Decision Tree', runtime, mse, rmse, mae, precision, recall, f1, prec_k, rec_k) #this prints the formated results for the decision tree model
     run_shap(dt_model, X_test, 'Decision Tree') #this prints the SHAP results for explainability
    
-
-
-
 
     start = time.time() #this is so runtime can be calculated it records the start time
     nb_model = Models.naive_bayes(X_train, y_train)#this trains the naive bayes model using the training data
@@ -429,9 +352,7 @@ def run():
    #prints the results
     print_results('Naive Bayes', runtime, mse,  rmse, mae, precision, recall, f1, prec_k, rec_k)
     run_shap(nb_model, X_test,'Naive Bayes')
-   
-
-
+  
 
 
     start = time.time()
@@ -452,13 +373,7 @@ def run():
     print_results('MLP Neural Network', runtime, mse, rmse, mae, precision, recall, f1,  prec_k, rec_k)
     run_shap(mlp_model, X_test, 'MLP')
 
-
-
-
     save_comparison_chart(results) #this saves all the results in the comparison table
-
-
-
 
     #this should print the comparison table of all 3 manual models
     print("\n\n" + "-" * 70)
@@ -479,6 +394,12 @@ def run():
             f"{m['Precision@k']:>7.4f} {m['Recall@k']:>7.4f} {m['Runtime']:>6.1f}s"
         )
     print("-" * 70) #prints a line at the bottom of the table
+
+    import json
+    with open('results_manual.json', 'w') as f:
+        json.dump(results, f)
+    print("Saved: results_manual.json")
+
     return results
 
 

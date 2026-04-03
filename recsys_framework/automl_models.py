@@ -16,13 +16,14 @@ class AutoMLModels:
 
             metric = "rmse", #flaml optimises for lowest rmse (ensures fair comparison as i will use it for all models)
             verbose = 0 #prints nothing in output at first so terminal stays clean
-
-
         )
 
         print(f" FLAML selected: {model.best_estimator}") #this prints the best model flaml found for the task 
         return model
     
+    
+
+
 
 
     def pycaret(self, X_train, y_train):
@@ -34,7 +35,6 @@ class AutoMLModels:
         train_df =X_train.copy() #this creates a copy of the x_train data
         train_df['rating'] = y_train.values
 
-
         setup(
             data=train_df,
             target='rating',
@@ -43,23 +43,36 @@ class AutoMLModels:
             html=False
         )
 
-
-
         best_model = compare_models(
             sort='RMSE',
             n_select=1,
             verbose=True
         )
 
-
-
         results_df = pull()
         best_name = str(results_df.index[0])
         print(f"  PyCaret selected: {best_name}")
-
-
         return best_model
     
+
+
+
+
+    def undummy_occupation(df):
+        """Collapse occupation_* dummy columns back into one string column."""
+        occ_cols = [c for c in df.columns if c.startswith("occupation_")]
+        if occ_cols:
+            df = df.copy()
+            df["occupation"] = (
+                df[occ_cols]
+                .idxmax(axis=1)
+                .str.replace("occupation_", "", regex=False)
+            )
+            df = df.drop(columns=occ_cols)
+        return df
+    
+
+
 
 
     def h2o(self, X_train, y_train, max_models=10):
@@ -71,7 +84,7 @@ class AutoMLModels:
         h2o.init(verbose=False)
         h2o.no_progress()
 
-        train_df = X_train.copy()
+        train_df = self.undummy_occupation(X_train.copy())
         train_df['rating'] = y_train.values
         train_h2o = h2o.H2OFrame(train_df)
 
@@ -96,14 +109,25 @@ class AutoMLModels:
         best_name = aml.leader.algo
         print(f"  H2O selected: {best_name}")
 
-
-
         class H2OWrapper:
 
             def __init__(self, leader):
                     self.leader = leader
                     self.best_name = best_name
                     self.feature_names_in_ = X_train.columns.tolist()
+
+            @staticmethod
+            def _undummy(df):
+                occ_cols = [c for c in df.columns if c.startswith("occupation_")]
+                if occ_cols:
+                    df = df.copy()
+                    df["occupation"] = (
+                        df[occ_cols]
+                        .idxmax(axis=1)
+                        .str.replace("occupation_", "", regex=False)
+                    )
+                    df = df.drop(columns=occ_cols)
+                return df
 
             def predict(self, X):
                 frame = h2o.H2OFrame(X)
