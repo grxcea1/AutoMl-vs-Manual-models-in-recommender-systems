@@ -38,7 +38,7 @@ class ManualModels:
 
         model.fit(x_train, y_train)
 
-        return model
+        return model #returns tarined model
 
 
 

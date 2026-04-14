@@ -7,8 +7,11 @@ import matplotlib #load the matploy library
 matplotlib.use("agg") #'agg' is needed for when i want to save files
 import matplotlib.pyplot as plt #plt will be used to refer matplot library (for making graphs)
 import pandas as pd #import pandas for builidng dataframes
+from pycaret.regression import (setup, compare_models, #imports pycaret tools for regression AutoML
+                                    predict_model, pull)
 import h2o
 from h2o.automl import H2OAutoML
+
 
 
 
@@ -28,6 +31,7 @@ def evaluate_model(y_test, y_pred):
   precision = precision_score(y_test_binary, y_pred_binary, zero_division= 0) # this works out, of all the that i collected which ones were good
   recall = recall_score(y_test_binary, y_pred_binary, zero_division=0) #this measures of all the good movies, how many did the recommender collect
   f1 = f1_score(y_test_binary, y_pred_binary, zero_division=0) #this gives a combined score of precison and recall
+
   return mse, rmse, mae, precision, recall, f1
 
 
@@ -191,41 +195,49 @@ def show_top10(model, preprocess, model_name, X_test, y_test, sample_users_ids =
 
 def run_flaml(X_train, X_test, y_train, y_test,
               preprocess, time_budget=120):
-    from flaml import AutoML
+    from flaml import AutoML  #imports FLAML Automl framework 
 
+    #header section
     print("\n" + "=" * 46)
     print("Running FLAML AutoML...")
     print(f"Time budget: {time_budget} seconds")
-    print("FLAML will automatically try many algorithms")
-    print("and select the best performing one")
     print("=" * 46)
 
-    automl = AutoML()
-    start = time.time()
-    automl.fit(
-        X_train=X_train,
-        y_train=y_train,
-        task='regression',
-        time_budget=time_budget,
-        metric='rmse',
-        verbose=0
-    )
-    runtime = time.time() - start
-    best_name = automl.best_estimator
-    print(f"\nFLAML selected: {best_name}")
-    print("Note this algorithm name for your report")
+    automl = AutoML() #creates Flaml Automl object
+    start = time.time() #this starts timer to measure total training time
 
-    y_pred = automl.predict(X_test)
+    # train multiple models automatically and picks the best one
+    automl.fit(
+        X_train=X_train, #features used for training
+        y_train=y_train, #targets
+        task='regression', #predicts ratings (continuous values)
+        time_budget=time_budget, #max time allowed for model search 
+        metric='rmse', #optimisation metric
+        verbose=0 #makes sure logs dont print
+    )
+
+    runtime = time.time() - start #calculates total training time
+    best_name = automl.best_estimator #best model picked by Flaml
+    print(f"\nFLAML selected: {best_name}")
+
+    y_pred = automl.predict(X_test) #predictions on test data
+
+    # collects the values for each metric for flaml
     mse, rmse, mae, precision, recall, f1 = evaluate_model(
         y_test, y_pred)
 
-    best_model = automl.model.estimator
+    best_model = automl.model.estimator #decideds on the trained best model
+
+    # this works out the top 10 metrics
     prec_k, rec_k = show_top10(
         best_model, preprocess, 'FLAML',
         X_test, y_test, sample_users_ids=[1, 2, 3])
+    
+    #print full results
     print_results('FLAML', runtime, mse, rmse, mae,
                   precision, recall, f1, prec_k, rec_k)
-
+    
+    #this returns all the metrics that have been calculated 
     return {
         'MSE': mse, 'RMSE': rmse, 'MAE': mae,
         'Precision': precision, 'Recall': recall,
@@ -243,51 +255,53 @@ def run_flaml(X_train, X_test, y_train, y_test,
 
 
 def run_pycaret(X_train, X_test, y_train, y_test, preprocess):
-    from pycaret.regression import (setup, compare_models,
-                                    predict_model, pull)
 
-    print("\n" + "=" * 46)
+    #header section
+    print("\n" + "-" * 46)
     print("Running PyCaret AutoML...")
-    print("PyCaret will compare many algorithms")
-    print("and return the single best one")
-    print("=" * 46)
+    print("-" * 46)
 
+    # combines features and target because PyCaret requires one dataset
     train_df = X_train.copy()
     train_df['rating'] = y_train.values
-    start = time.time()
 
+    start = time.time() #this starts timer to measure total training time and selection time 
+
+    #initialise pyCaret enviroment 
     setup(
-        data=train_df,
-        target='rating',
-        session_id=42,
-        verbose=False,
-        html=False
+        data=train_df, #full dataset (features and target)
+        target='rating', #this is the column we want to predict
+        session_id=42, # this controlds the randomness (so we get the same results everytime)
+        verbose=False, #this makes the program print little (makes output clean and readable)
+        html=False #no html output
     )
 
-    best = compare_models(
-        sort='RMSE',
-        n_select=1,
-        verbose=False
+    #traisn multiple models and selects the best one based on rmse
+    best = compare_models( 
+        sort='RMSE', #sorts preictions br rmse (lowest to highest)
+        n_select=1, #returns only the best model 
+        verbose=False # makes sure the output is clean
     )
-    runtime = time.time() - start
-    results_df = pull()
-    best_name = str(results_df.index[0])
-    print(f"\nPyCaret selected: {best_name}")
-    print("Note this algorithm name for your report")
 
-    test_df = X_test.copy()
-    predictions_df = predict_model(best, data=test_df)
-    y_pred = predictions_df['prediction_label'].values
+    runtime = time.time() - start #stops the timer 
+    results_df = pull() #gets the results table
+    best_name = str(results_df.index[0]) # gets the best models name
+    print(f"\nPyCaret selected: {best_name}") #prints the name of the best model
+
+    test_df = X_test.copy() #makes a copy of test data so we dont mess up the original 
+    predictions_df = predict_model(best, data=test_df) #uses the best model to make predictions on the test data
+    y_pred = predictions_df['prediction_label'].values #this extracts the predicted values 
 
     mse, rmse, mae, precision, recall, f1 = evaluate_model(
-        y_test, y_pred)
+        y_test, y_pred) #this evalues the moodel (compares the predictions made to the real ratings)
 
-    prec_k, rec_k = show_top10(
-        best, preprocess, 'PyCaret',
-        X_test, y_test, sample_users_ids=[1, 2, 3])
+    
+    prec_k, rec_k = show_top10(  #this is calling my function to get top top 10 recommendations per user
+        best, preprocess, 'PyCaret', # best is my train pycaret modle, preprocesss is an object , pycaret is a label
+        X_test, y_test, sample_users_ids=[1, 2, 3]) #the features, the actual ratings and the users 
 
     print_results('PyCaret', runtime, mse, rmse, mae,
-                  precision, recall, f1, prec_k, rec_k)
+                  precision, recall, f1, prec_k, rec_k) #prints the results
 
     return {
         'MSE': mse, 'RMSE': rmse, 'MAE': mae,
@@ -295,26 +309,27 @@ def run_pycaret(X_train, X_test, y_train, y_test, preprocess):
         'F1': f1, 'Runtime': runtime,
         'Precision@k': prec_k, 'Recall@k': rec_k,
         'Best Algorithm': best_name
-    }
+    } #this returns a dictionary that stores all the results
 
 
 
 
 
 
-def undummy_occupation(df):
-    """Collapse occupation_* dummy columns back into one string column."""
-    occ_cols = [c for c in df.columns if c.startswith("occupation_")]
+def undummy_occupation(df): #this functions converts the occupation columns from one-hot encoded columns done in preropcessing back to one column (so it can be used in h20)
+    occ_cols = [c for c in df.columns if c.startswith("occupation_")] #finds all the columns that start with occupation 
     if occ_cols:
-        df = df.copy()
+        df = df.copy() #makes a copy to not mess up original data
+
+        # for each row it finds out what occupation column has the value 1
         df["occupation"] = (
             df[occ_cols]
-            .idxmax(axis=1)
-            .str.replace("occupation_", "", regex=False)
-        )
-        df = df.drop(columns=occ_cols)
-    return df
-
+            .idxmax(axis=1) #gets the column name with the value 1
+            .str.replace("occupation_", "", regex=False) #cleans the name by removing "occupation" and replacing it with nothing ("")
+                    )
+        
+        df = df.drop(columns=occ_cols) # removes the original dummy columns so we only have one occupation column
+    return df #returns the updated dataframe
 
 
 
@@ -322,53 +337,54 @@ def undummy_occupation(df):
 def run_h2o(X_train, X_test, y_train, y_test,
             preprocess, max_models=10):
 
-    print("\n" + "=" * 46)
+    print("\n" + "-" * 46)
     print("Running H2O AutoML...")
     print(f"Training up to {max_models} models")
-    print("H2O will also try stacked ensembles")
-    print("=" * 46)
+    print("-" * 46)
 
-    h2o.init(verbose=False)
-    h2o.no_progress()
+    h2o.init(verbose=False) #starts h20 server
+    h2o.no_progress() #hides the progress bars for a cleaner output
 
-    train_df = undummy_occupation(X_train.copy()).reset_index(drop=True) #this is so we can use the same function to undummy the test data and train data (we will use the test data to get the column names for the model to use)
-    train_df['rating'] = y_train.values
+    train_df = undummy_occupation(X_train.copy()).reset_index(drop=True) # converts one-hopt encoded occupation solumns back to a single column
+    train_df['rating'] = y_train.values #adds target column 
 
-    test_df = undummy_occupation(X_test.copy()).reset_index(drop=True) #this is so we can use the same function to undummy the test data and train data (we will use the test data to get the column names for the model to use)
-    test_df['rating'] = 0  # dummy column
+    test_df = undummy_occupation(X_test.copy()).reset_index(drop=True) #prepares test data
+    test_df['rating'] = 0  #target column (h20 needs training and test data to  have the same structure)
 
-    # Convert to H2OFrame — H2O handles categoricals natively
+    # changes the training and  test data into h20 format
     train_h2o = h2o.H2OFrame(train_df)
     test_h2o = h2o.H2OFrame(test_df)
 
-    # Tell H2O which columns are categorical so it encodes them consistently
-    for col in train_h2o.columns:
-        if train_h2o[col].isfactor()[0] or train_df[col].dtype == object:
-            train_h2o[col] = train_h2o[col].asfactor()
-            test_h2o[col] = test_h2o[col].asfactor()
+    
+    for col in train_h2o.columns: #loops through every column in the trianing dataset
+        if train_h2o[col].isfactor()[0] or train_df[col].dtype == object: # checks if column is already cetergorical in h20
+            train_h2o[col] = train_h2o[col].asfactor() # converts traning column into categorical type (no longer meaningles but now part of a group)
+            test_h2o[col] = test_h2o[col].asfactor() # converts test colun into categorical type 
 
-    feature_cols = [c for c in train_df.columns if c != 'rating']
-    target_col = 'rating'
-    aml = H2OAutoML(max_models=max_models, seed=42, sort_metric='RMSE')
-    start = time.time()
-    aml.train(x=feature_cols, y=target_col, training_frame=train_h2o)
-    runtime = time.time() - start
+    feature_cols = [c for c in train_df.columns if c != 'rating'] #defines the feature columns
+    target_col = 'rating' #defines the target column
 
-    best_name = aml.leader.algo
-    print(f"\nH2O selected: {best_name}")
-    print("Note this algorithm name for your report")
+    #this initialises the h20 Automl object with speciific parameters 
+    aml = H2OAutoML(max_models=max_models, seed=42, sort_metric='RMSE') # max models = num of models to try , seed = reporducibility , sort = sorts by rmse (lowest to highest)
 
-    preds_h2o = aml.leader.predict(test_h2o)
-    y_pred = preds_h2o.as_data_frame()['predict'].values
-    mse, rmse, mae, precision, recall, f1 = evaluate_model(y_test, y_pred)
+    start = time.time() #time to train and select the best model
+    aml.train(x=feature_cols, y=target_col, training_frame=train_h2o) #this trains the mode
+    runtime = time.time() - start  # measures total time taken 
 
-    wrapped = H2OWrapper(aml.leader, feature_cols)
-    prec_k, rec_k = show_top10(
-        wrapped, preprocess, 'H2O AutoML',
-        X_test, y_test, sample_users_ids=[1, 2, 3])
+    best_name = aml.leader.algo #gets the best model
+    print(f"\nH2O selected: {best_name}") #prints the name of the best model
+
+    preds_h2o = aml.leader.predict(test_h2o) #makes predictions
+    y_pred = preds_h2o.as_data_frame()['predict'].values #converts predictions back to numpy array
+    mse, rmse, mae, precision, recall, f1 = evaluate_model(y_test, y_pred) #evaluates the model
+
+    wrapped = H2OWrapper(aml.leader, feature_cols) #warps h20 model so that i can use the .predict fucntion
+    prec_k, rec_k = show_top10( #this is calling my function to get top top 10 recommendations per user
+        wrapped, preprocess, 'H2O AutoML', # wrapped is my trained h20 model, preprocesss is an object , "H20 AutoML" is a label
+        X_test, y_test, sample_users_ids=[1, 2, 3])  #the features, the actual ratings and the users
 
     print_results('H2O AutoML', runtime, mse, rmse, mae,
-                  precision, recall, f1, prec_k, rec_k)
+                  precision, recall, f1, prec_k, rec_k) #prints the results 
 
     return {
         'MSE': mse, 'RMSE': rmse, 'MAE': mae,
@@ -376,14 +392,9 @@ def run_h2o(X_train, X_test, y_train, y_test,
         'F1': f1, 'Runtime': runtime,
         'Precision@k': prec_k, 'Recall@k': rec_k,
         'Best Algorithm': best_name
-    }
+    } #this returns a dictionary that stores all the results
 
- 
-
-
-
-
-
+  
 
 
 
@@ -391,30 +402,35 @@ def run_h2o(X_train, X_test, y_train, y_test,
 
 class H2OWrapper:
     def __init__(self, leader, feature_cols):
-        self.leader = leader
-        self.feature_names_in_ = feature_cols
+        self.leader = leader  # stores the trained H2O model 
+        self.feature_names_in_ = feature_cols  # saves the feature column names (needed so it matches training format)
 
     @staticmethod
     def _undummy(df):
-        occ_cols = [c for c in df.columns if c.startswith("occupation_")]
+        occ_cols = [c for c in df.columns if c.startswith("occupation_")]  # finds all one-hot encoded occupation columns
         if occ_cols:
-            df = df.copy()
+            df = df.copy()  # makes a copy so we don’t change the original data
+
+            # for each row it finds which occupation column has value 1
             df["occupation"] = (
                 df[occ_cols]
-                .idxmax(axis=1)
-                .str.replace("occupation_", "", regex=False)
+                .idxmax(axis=1)  # gets the column name with the highest value (the 1)
+                .str.replace("occupation_", "", regex=False)  # removes "occupation_" to keep just the job name
             )
-            df = df.drop(columns=occ_cols)
-        return df
+            df = df.drop(columns=occ_cols)  # removes the dummy columns so we only have one occupation column
+        return df  # returns updated dataframe
 
     def predict(self, X):
-        df = self._undummy(X.copy())        # ← actually call _undummy
-        frame = h2o.H2OFrame(df)
-        if "occupation" in frame.columns:
-            frame["occupation"] = frame["occupation"].asfactor()  # ← mark as categorical
-        preds = self.leader.predict(frame)
-        return preds.as_data_frame()['predict'].values
+        df = self._undummy(X.copy())  # converts one-hot occupation columns back into a single column
+        frame = h2o.H2OFrame(df)  # converts pandas dataframe into H2O format
 
+        # if occupation column exists, convert it into categorical type
+        if "occupation" in frame.columns:
+            frame["occupation"] = frame["occupation"].asfactor()  # tells H2O this is a category, not a number
+
+        preds = self.leader.predict(frame)  # uses the trained H2O model to make predictions
+
+        return preds.as_data_frame()['predict'].values # converts predictions from H2O format back to numpy array 
 
 
 
@@ -480,68 +496,79 @@ def save_comparison_chart(results, suffix= "automl"): #this stores the table as 
         
 # this function is what will allow all the models to run in the correct order
 def run():   
-    print("\nLoading and preprocessing data...") # line that makes it clear we are loading and preprocessing
-    preprocess = preprocessing() #creates instance of preprocess class
-    X_train, X_test, y_train, y_test = preprocess.load_and_preprocess() #performs preprocessing on data set
+    preprocess = preprocessing() # creates an instance of the preprocessing class (so we can use its functions)
 
-    print(f"Training set size: {X_train.shape[0]} rows")
-    print(f"Test set size:     {X_test.shape[0]} rows")                   
-    print(f"Features:          {X_train.shape[1]} columns")
+    X_train, X_test, y_train, y_test = preprocess.load_and_preprocess() # loads the dataset and splits into training + testing data
 
-    results = {}
+    print(f"Training set size: {X_train.shape[0]} rows") #shows how many rows are in training data
+    print(f"Test set size:     {X_test.shape[0]} rows")  #shows how many rows are in test data                  
+    print(f"Features:          {X_train.shape[1]} columns") #shows how many feature columns the model uses
+
+    results = {} # dictionary to store results from each AutoML model
 
     try:
+        # runs FLAML AutoML and stores results in dictionary under 'FLAML'
         results['FLAML'] = run_flaml(
             X_train, X_test, y_train, y_test,
-            preprocess, time_budget=120)
+            preprocess, time_budget=120) # time_budget controls how long FLAML searches for best model
+
     except Exception as e:
-        print(f"\nFLAML failed: {e}")
+        print(f"\nFLAML failed: {e}") #if FLAML crashes, this prevents the whole program from stopping
 
     
     try:
+        # runs PyCaret AutoML and stores results
         results['PyCaret'] = run_pycaret(
             X_train, X_test, y_train, y_test, preprocess)
+
     except Exception as e:
-        print(f"\nPyCaret failed: {e}")
+        print(f"\nPyCaret failed: {e}") # handles any errors so the next model can still run
 
    
     try:
+        # runs H2O AutoML and stores results
         results['H2O AutoML'] = run_h2o(
             X_train, X_test, y_train, y_test,
-            preprocess, max_models=10)
+            preprocess, max_models=10) # max_models limits how many models H2O tries
+
     except Exception as e:  
-        print(f"\nH2O failed: {e}")
+        print(f"\nH2O failed: {e}") #catches errors for H2O as well
 
     if not results:
-        return
+        return #if all models failed, stop the function
 
-    save_comparison_chart(results, suffix ="automl") #this saves all the results in the comparison table
+    save_comparison_chart(results, suffix ="automl") # creates and saves comparison charts for all AutoML models
 
-    #this should print the comparison table of all 3 manual models
+    # prints a clean summary table
     print("\n\n" + "-" * 70)
     print("  FINAL SUMMARY — AUTOML MODELS")
     print("-" * 70)
 
-    print(f"  {'Model':<20} {'MSE':>8}  {'RMSE':>8} {'MAE':>8} {'Prec':>8} {'Recall':>8} {'F1':>8} {'Time':>8}") #this is used to line the columns up nicely so it can be read clearly
-    print("-" * 70) #prints a line for seperation
+    # formats column headers so everything lines up nicely
+    print(f"  {'Model':<20} {'MSE':>8}  {'RMSE':>8} {'MAE':>8} {'Prec':>8} {'Recall':>8} {'F1':>8} {'Time':>8}")
+    print("-" * 70) # line for separation
 
-    #this prints all the model results in one row each
+    # loops through each model and prints its results
     for name, m in results.items():
         print(
             f"  {name:<20} {m['MSE']:>8.4f} {m['RMSE']:>8.4f} {m['MAE']:>8.4f} "
             f"{m['Precision']:>8.4f} {m['Recall']:>8.4f} "
             f"{m['F1']:>8.4f} {m['Runtime']:>7.1f}s"
         )
-    print("-" * 70) #prints a line at the bottom of the table 
 
-    import json
+    print("-" * 70) # bottom line of the table 
+
+    import json # imports json so we can save results to a file
+
+    # saves all results into a JSON file 
     with open('results_automl.json', 'w') as f:
         json.dump(results, f)
-    print("Saved: results_automl.json")
 
-    return results
+    return results # returns results dictionary
 
-run()
+run() # runs the whole pipeline
+
+
 
 
     

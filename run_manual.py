@@ -228,7 +228,7 @@ def run_shap(model, X_test, model_name):
     plt.barh(
         [X_sample.columns[i] for i in sorted_idx],  # sets feature names as labels
         mean_shap[sorted_idx],  # these are their average impact scores
-        color='#E91E63' # pink bars — just a different color to distinguish this chart from the feature importance chart
+        color="#58E1BA" # pink bars — just a different color to distinguish this chart from the feature importance chart
     )
     plt.xlabel("Mean SHAP Value : The average impact on predicted rating", fontsize=11) #this is the title of the chart
     plt.title(f"SHAP Feature Impact : {model_name}", fontsize=13, fontweight='bold') #this labels the model name on the chart
@@ -329,7 +329,7 @@ def run():
         'Precision@k': prec_k,  
         'Recall@k': rec_k  
     }
-    
+
     #prints the results
     print_results('Decision Tree', runtime, mse, rmse, mae, precision, recall, f1, prec_k, rec_k) #this prints the formated results for the decision tree model
     run_shap(dt_model, X_test, 'Decision Tree') #this prints the SHAP results for explainability
@@ -395,10 +395,10 @@ def run():
         )
     print("-" * 70) #prints a line at the bottom of the table
 
-    import json
+    import json #imports hson to save resultsin file format
     with open('results_manual.json', 'w') as f:
-        json.dump(results, f)
-    print("Saved: results_manual.json")
+        json.dump(results, f) # saves the results in to ajson file 
+    print("Saved: results_manual.json") # this printline confirms results have been saved 
 
     return results
 
