@@ -1,7 +1,7 @@
 from recsys_framework.preprocessing import preprocessing #importing preprocessing class into my folder
 from sklearn.metrics import mean_squared_error, mean_absolute_error #importing the mse and Rmse from the sklearn library
 from sklearn.metrics import f1_score, recall_score, precision_score  #importing f1,precison and recall from the sklearn library
-import numpy as np #importing numpy for mathematically operations
+import numpy as np #importing numpy for mathematical operations
 import time #importing time to work out the time each model takes to train
 import matplotlib #load the matploy library
 matplotlib.use("agg") #'agg' is needed for when i want to save files
