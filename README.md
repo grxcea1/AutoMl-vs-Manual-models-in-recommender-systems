@@ -1,36 +1,56 @@
 # AutoMl-vs-Manual-models-in-recommender-systems
 **Overview**
 
-This project develops a modular and extensible recommender system as part of a Final Year Project. The goal is to design, implement, and evaluate multiple collaborative filtering algorithms within a structured pipeline.
+In my Final Year Project, i built and evaluated a recommender system to compare AutoML frameworks with manually implemented models under controlled conditions.
 
-Different models are trained and compared using standard evaluation metrics, and the best-performing model is selected and integrated into a reusable Python-based library. The final outcome is a clean, organized recommender system that can be easily extended or adapted.
+The main aim was to test whether AutoML actually performs better than manual models when everything is kept consistent. To do this, I designed a structured pipeline where all models use the same preprocessing, data split, and evaluation metrics.
+
+Six models were tested: three manual models (Decision Tree, Naïve Bayes, and MLP) and three AutoML frameworks (FLAML, PyCaret, and H2O AutoML). Based on the results, I built a reusable Python library called recsys_framework, which includes different recommendation modes depending on the use case.
 
 **Project Objectives**
 
-Implement multiple collaborative filtering algorithms
+Compare AutoML frameworks with manually implemented models in a fair setup
 
-Evaluate and compare model performance using RMSE and MAE
+Evaluate models using multiple metrics (RMSE, MAE, Precision, Recall, runtime)
 
-Perform hyperparameter tuning to improve model accuracy
+Analyse trade-offs between accuracy, efficiency, and interpretability
 
-Design and build a modular recommender pipeline
+Apply SHAP to understand model behaviour (manual models only)
 
-Develop a reusable Python recommendation library
+Build a modular recommender system pipeline
 
-Provide justification for model selection based on experimental results
+Develop a reusable Python recommendation library based on results
 
 **Methodology**
 
-The project follows a structured experimental approach:
+Preprocessed the MovieLens 100K dataset using one consistent pipeline
 
-Data preprocessing and formatting
+Used a fixed 80/20 train-test split
 
-Train-test data splitting
+Trained and evaluated all six models under the same conditions
 
-Training multiple recommendation algorithms
+Selected the certain models and integrated them into the final library based on my results
 
-Evaluating performance using standard metrics
 
-Hyperparameter tuning of the best-performing model
+**Key Findings**
+AutoML models achieved better prediction accuracy
 
-Integrating the selected model into a custom recommendation pipeline
+Manual models were significantly faster
+
+Differences in recommendation quality were small
+
+There is a clear trade-off between accuracy, speed, and interpretability
+
+
+**Library (recsys_framework)**
+The final system is implemented as a Python package with four modes:
+
+accurate mode – FLAML
+
+fast mode – MLP
+
+explainable mode – Decision Tree (with SHAP)
+
+ensemble mode – FLAML + MLP
+
+The library is modular, so it can be easily reused.
