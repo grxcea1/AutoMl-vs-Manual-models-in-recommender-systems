@@ -47,7 +47,7 @@ The final system is implemented as a Python package with four modes:
 
 accurate mode – FLAML
 
-fast  mode – MLP
+fast mode – MLP
 
 explainable mode – Decision Tree (with SHAP)
 
