@@ -43,11 +43,11 @@ There is a clear trade-off between accuracy, speed, and interpretability
 
 
 **Library (recsys_framework)**
-The final system is implemented as a Python package with four modes:
+The final system is implemented as a Python package with four modes: 
 
 accurate mode – FLAML
 
-fast mode – MLP
+fast mode – MLP  
 
 explainable mode – Decision Tree (with SHAP)
 
